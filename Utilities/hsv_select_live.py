@@ -1,7 +1,4 @@
 import time # Provides time-related functions
-start = time.perf_counter_ns()
-
-# tty.setcbreak(sys.stdin)
 
 # import the necessary packages
 from picamera.array import PiRGBArray # Generates a 3D RGB array
@@ -18,7 +15,9 @@ cv2.namedWindow(window_name, cv2.WINDOW_AUTOSIZE)
 hsv_min = np.array([0, 0, 0])
 hsv_max = np.array([179, 255, 255])
 
-resolution = (640, 480)
+# resolution = (640, 480)
+resolution = (320, 240)
+# resolution = (960, 720)
 
 def ResizeWithAspectRatio(image, width=None, height=None, inter=cv2.INTER_AREA):
     dim = None
@@ -56,7 +55,6 @@ def update():
                 hsv_min[0] = cv2.getTrackbarPos('H_min', window_name)
                 hsv_min[1] = cv2.getTrackbarPos('S_min', window_name)
                 hsv_min[2] = cv2.getTrackbarPos('V_min', window_name)
-
                 hsv_max[0] = cv2.getTrackbarPos('H_max', window_name)
                 hsv_max[1] = cv2.getTrackbarPos('S_max', window_name)
                 hsv_max[2] = cv2.getTrackbarPos('V_max', window_name)
@@ -100,7 +98,6 @@ def callback(value):
 cv2.createTrackbar('H_min', window_name, 0, 179, callback)
 cv2.createTrackbar('S_min', window_name, 0, 255, callback)
 cv2.createTrackbar('V_min', window_name, 0, 255, callback)
-
 cv2.createTrackbar('H_max', window_name, 0, 179, callback)
 cv2.createTrackbar('S_max', window_name, 0, 255, callback)
 cv2.createTrackbar('V_max', window_name, 0, 255, callback)
@@ -110,10 +107,9 @@ cv2.createTrackbar('V_max', window_name, 0, 255, callback)
 cv2.setTrackbarPos('H_min', window_name, 0)
 cv2.setTrackbarPos('S_min', window_name, 0)
 cv2.setTrackbarPos('V_min', window_name, 0)
-
-cv2.setTrackbarPos('H_max', window_name, 0)
-cv2.setTrackbarPos('S_max', window_name, 0)
-cv2.setTrackbarPos('V_max', window_name, 0)
+cv2.setTrackbarPos('H_max', window_name, 179)
+cv2.setTrackbarPos('S_max', window_name, 255)
+cv2.setTrackbarPos('V_max', window_name, 255)
 
 
 # wait for 'ESC' destroy windows
