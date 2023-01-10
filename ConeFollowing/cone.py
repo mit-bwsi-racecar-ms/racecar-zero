@@ -144,6 +144,7 @@ def followCone():
 
             # The camera is mounted upside down, so flip the image vertically
             camera.vflip = True
+            camera.hflip = True
 
             # Wait a tenth of a second to allow the camera time to warmup
             time.sleep(0.1)
@@ -161,8 +162,6 @@ def followCone():
 
                 nFrames += 1
 
-                print("here")
-
                 # Grab the raw NumPy array representing the image
                 image = frame.array
 
@@ -175,9 +174,6 @@ def followCone():
                     # Do a little averaging of the size, since individual measurements are noisy
                     blobSizeFiltered = (0.6 * blobSize) + (0.4 * blobSizeFiltered)
 
-                    # Print the size of the contour for debugging
-                    print(blobSizeFiltered)
-
                     # Check if the contour/object should or should not be ignored
                     if blobSizeFiltered > IGNORABLE_BLOB_SIZE:
                         # Call the getSpeed and getDirection function to determine how to drive the car
@@ -187,9 +183,10 @@ def followCone():
 
                     # For debugging, displays the frames that the camera gets
 
-                    # if nFrames % 10 == 0:
-                    #     cv2.drawContours(image, [largestBlob], -1, (0, 255, 0), 3)
-                    #     cv2.imshow("Frame", image)
+                    if nFrames % 10 == 0:
+                        cv2.drawContours(image, [largestBlob], -1, (0, 255, 0), 3)
+                        cv2.imshow("Frame", image)
+                        cv2.waitKey(1)
 
                 # Done with that frame, clear it
                 rawCapture.truncate(0)
@@ -246,7 +243,7 @@ def getDirection(blob):
         # Filter (average) the center
         centerFiltered = (0.8 * blobCenter) + (0.2 * centerFiltered)
 
-        return (centerFiltered - float(screenCenter)) / screenWidth
+        return (float(screenCenter) - centerFiltered) / screenWidth
 
     return 0
 
