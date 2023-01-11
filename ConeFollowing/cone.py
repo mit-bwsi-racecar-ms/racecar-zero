@@ -181,12 +181,12 @@ def followCone():
                     else:
                         drive(0, 0)
 
-                    # For debugging, displays the frames that the camera gets
+                # For debugging, displays the frames that the camera gets
 
-                    if nFrames % 10 == 0:
-                        cv2.drawContours(image, [largestBlob], -1, (0, 255, 0), 3)
-                        cv2.imshow("Frame", image)
-                        cv2.waitKey(1)
+                if nFrames % 5 == 0:
+                    cv2.drawContours(image, [largestBlob], -1, (0, 255, 0), 3)
+                    cv2.imshow("Frame", image)
+                    cv2.waitKey(1)
 
                 # Done with that frame, clear it
                 rawCapture.truncate(0)
