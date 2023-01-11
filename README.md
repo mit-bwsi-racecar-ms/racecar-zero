@@ -1,2 +1,2 @@
 # racecar-zero
-Code for RACECAR Zero
+Code for RACECAR-Zero
