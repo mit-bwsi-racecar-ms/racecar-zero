@@ -1,10 +1,9 @@
-import time # Provides time-related functions
+from picamera2 import Picamera2 # Provides a Python interface for the RPi Camera Module
+from libcamera import Transform
 
-# import the necessary packages
-from picamera.array import PiRGBArray # Generates a 3D RGB array
-from picamera import PiCamera # Provides a Python interface for the RPi Camera Module
-import cv2 # OpenCV library
-import numpy as np # Numpy Library
+import time # Python time functions
+import cv2 # OpenCV computer vision library
+import numpy as np # NumPy library for numerical programming in Python
 
 print("Starting HSV Select Live")
 
@@ -36,59 +35,60 @@ def ResizeWithAspectRatio(image, width=None, height=None, inter=cv2.INTER_AREA):
 
 def update():
 
+    nFrames = 0
+    show_start = 100
+
     try:
+        while True:
 
-        with PiCamera() as camera:
+            image = picam2.capture_array()
 
-            camera.resolution = resolution
+            nFrames += 1
 
-            camera.vflip = True
+            hsv_min[0] = cv2.getTrackbarPos('H_min', window_name)
+            hsv_min[1] = cv2.getTrackbarPos('S_min', window_name)
+            hsv_min[2] = cv2.getTrackbarPos('V_min', window_name)
+            hsv_max[0] = cv2.getTrackbarPos('H_max', window_name)
+            hsv_max[1] = cv2.getTrackbarPos('S_max', window_name)
+            hsv_max[2] = cv2.getTrackbarPos('V_max', window_name)
 
-            camera.framerate = 30
+            image_hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-            raw_capture = PiRGBArray(camera, size=resolution)
+            mask = cv2.inRange(image_hsv, hsv_min, hsv_max)
 
-            for frame in camera.capture_continuous(raw_capture, format="bgr", use_video_port=True):
+            mask = cv2.bitwise_and(image, image, mask = mask)
 
-                image = frame.array
+            h, w, ch = image.shape
 
-                hsv_min[0] = cv2.getTrackbarPos('H_min', window_name)
-                hsv_min[1] = cv2.getTrackbarPos('S_min', window_name)
-                hsv_min[2] = cv2.getTrackbarPos('V_min', window_name)
-                hsv_max[0] = cv2.getTrackbarPos('H_max', window_name)
-                hsv_max[1] = cv2.getTrackbarPos('S_max', window_name)
-                hsv_max[2] = cv2.getTrackbarPos('V_max', window_name)
+            cv2.putText(mask, 'HSV Lower: {}'.format(hsv_min), (10, 35), 0, 0.75, (255, 0, 0), 2)
 
-                image_hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+            cv2.putText(mask, 'HSV Upper: {}'.format(hsv_max), (10, 70), 0, 0.75, (255, 0, 0), 2)
 
-                mask = cv2.inRange(image_hsv, hsv_min, hsv_max)
+            resized_mask = ResizeWithAspectRatio(mask, width=300)
 
-                mask = cv2.bitwise_and(image, image, mask = mask)
+            show = cv2.resize(image, (160, 120))
+            cv2.imshow(window_name, mask)
+            cv2.waitKey(1)
 
-                h, w, ch = image.shape
+            key = cv2.waitKey(1) & 0xFF
 
-                cv2.putText(mask, 'HSV Lower: {}'.format(hsv_min), (10, 35), 0, 0.75, (255, 0, 0), 2)
+            if key == ord("q"):
+                break
 
-                cv2.putText(mask, 'HSV Upper: {}'.format(hsv_max), (10, 70), 0, 0.75, (255, 0, 0), 2)
+            time.sleep(0.1)
 
-                resized_mask = ResizeWithAspectRatio(mask, width=300)
-
-                cv2.imshow(window_name, mask)
-
-                key = cv2.waitKey(1) & 0xFF
-
-                raw_capture.truncate(0)
-
-                if key == ord("q"):
-                    break
-
-                time.sleep(0.1)
+            if nFrames == show_start:
+                # assume that the first few calls to imshow do a lot of setup.
+                start = time.perf_counter()
 
     except KeyboardInterrupt:
         pass
     finally:
         return
 
+    elapsed = time.perf_counter() - start
+    print((nFrames - show_start) / elapsed, "frames per second")
+    cv2.destroyAllWindows()
 
 def callback(value):
     update()
@@ -111,6 +111,14 @@ cv2.setTrackbarPos('H_max', window_name, 179)
 cv2.setTrackbarPos('S_max', window_name, 255)
 cv2.setTrackbarPos('V_max', window_name, 255)
 
+picam2 = Picamera2()
+picam2.configure(picam2.create_video_configuration(main={"size": (640, 480),
+                                                        # Yes, OpenCV wants BGR. Somehow telling picamera
+                                                        # this gets the right colors. Go figure....
+                                                        "format": "XRGB8888"},
+                                                transform=Transform(hflip=True, vflip=True),
+                                                buffer_count=2))
+picam2.start()
 
 # wait for 'ESC' destroy windows
 while cv2.waitKey(200) & 0xFF != 27:
