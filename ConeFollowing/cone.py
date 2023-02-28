@@ -1,13 +1,14 @@
 import RPi.GPIO as GPIO # Library for handling GPIO pins
 from rpi_hardware_pwm import HardwarePWM # Hardware PWM functions
 
-from picamera2 import Picamera2 # Provides a Python interface for the RPi Camera Module
-from libcamera import Transform
+from picamera import PiCamera # Provides a Python interface for the RPi Camera Module
+from picamera.array import PiRGBArray # Generates a 3D RGB array
 
 import time # Python time functions
 import cv2 # OpenCV computer vision library
 import numpy as np # NumPy library for numerical programming in Python
 import sys # Some system functions, in case we need them for debugging
+
 
 ### Motor functions and setup
 
@@ -132,67 +133,73 @@ count = 0
 # Here's the main function.
 # Note that it is not called until the end of this file.
 def followCone():
-
-    picam2 = Picamera2()
-    picam2.configure(picam2.create_video_configuration(main={"size": (640, 480),
-                                                            # Yes, OpenCV wants BGR. Somehow telling picamera
-                                                            # this gets the right colors. Go figure....
-                                                            "format": "XRGB8888"},
-                                                    transform=Transform(hflip=True, vflip=True),
-                                                    buffer_count=2))
-    picam2.start()
-
-    GPIO.output(standby, GPIO.HIGH)
-
-    print("Start")
-    sys.stdout.flush()
-
-    start = 0
-    nFrames = 0
-    show_start = 100
-
     try:
-        while True:
 
-            image = picam2.capture_array()
+        nFrames = 0
 
-            nFrames += 1
+        # Initialize the camera
+        with PiCamera() as camera:
 
-            orangeBlobs = findBlobs(image, ORANGE_HSV_LOWER_BOUND, ORANGE_HSV_UPPER_BOUND)
+            camera.resolution = resolution
 
-            if len(orangeBlobs) > 0:
-                largestBlob = max(orangeBlobs, key = cv2.contourArea)
-                blobSize = cv2.contourArea(largestBlob)
-                global blobSizeFiltered
-                # Do a little averaging of the size, since individual measurements are noisy
-                blobSizeFiltered = (0.6 * blobSize) + (0.4 * blobSizeFiltered)
+            # The camera is mounted upside down, so flip the image vertically
+            camera.vflip = True
+            camera.hflip = True
 
-                # Check if the contour/object should or should not be ignored
-                if blobSizeFiltered > IGNORABLE_BLOB_SIZE:
-                    # Call the getSpeed and getDirection function to determine how to drive the car
-                    drive(getSpeed(blobSizeFiltered), getDirection(largestBlob))
-                else:
-                    drive(0, 0)
+            # Wait a tenth of a second to allow the camera time to warmup
+            time.sleep(0.1)
 
-            # For debugging, displays the frames that the camera gets
-            if nFrames % 10 == 0:
-                show = cv2.resize(image, (160, 120))
-                cv2.imshow("Image", show)
-                cv2.waitKey(1)      # Force OpenCV to actually show something.
-            if nFrames == show_start:
-                # assume that the first few calls to imshow do a lot of setup.
-                start = time.perf_counter()
+            # Generates a 3D RGB array and stores it in rawCapture
+            rawCapture = PiRGBArray(camera, size=resolution)
+
+            GPIO.output(standby, GPIO.HIGH)
+
+            print("Start")
+            sys.stdout.flush()
+
+            # Capture frames continuously from the camera
+            for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
+
+                nFrames += 1
+
+                # Grab the raw NumPy array representing the image
+                image = frame.array
+
+                orangeBlobs = findBlobs(image, ORANGE_HSV_LOWER_BOUND, ORANGE_HSV_UPPER_BOUND)
+
+                if len(orangeBlobs) > 0:
+                    largestBlob = max(orangeBlobs, key = cv2.contourArea)
+                    blobSize = cv2.contourArea(largestBlob)
+                    global blobSizeFiltered
+                    # Do a little averaging of the size, since individual measurements are noisy
+                    blobSizeFiltered = (0.6 * blobSize) + (0.4 * blobSizeFiltered)
+
+                    # Check if the contour/object should or should not be ignored
+                    if blobSizeFiltered > IGNORABLE_BLOB_SIZE:
+                        # Call the getSpeed and getDirection function to determine how to drive the car
+                        drive(getSpeed(blobSizeFiltered), getDirection(largestBlob))
+                    else:
+                        drive(0, 0)
+
+                # For debugging, displays the frames that the camera gets
+
+                if nFrames % 5 == 0:
+                    cv2.drawContours(image, [largestBlob], -1, (0, 255, 0), 3)
+                    cv2.imshow("Frame", image)
+                    cv2.waitKey(1)
+
+                # Done with that frame, clear it
+                rawCapture.truncate(0)
 
     except KeyboardInterrupt:
-        print("Quitting")
+        # If the user types control-C, stop
+        pass
     finally:
         print("Stop")
         stop()
         cleanup()
 
-    elapsed = time.perf_counter() - start
-    print((nFrames - show_start) / elapsed, "frames per second")
-    cv2.destroyAllWindows()
+
 
 def findBlobs(image, HSVLowerBound, HSVUpperBound):
     # Convert the image to the HSV color space
